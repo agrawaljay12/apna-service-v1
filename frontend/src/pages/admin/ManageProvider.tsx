@@ -1,0 +1,194 @@
+import { useEffect, useState } from "react";
+import { USER_ENDPOINTS } from "../../config/api";
+import { useTheme } from "../../context/ThemeContext";
+import { getAuthHeaderForFormData } from "../../utils/authHelper";
+import { fetchWithAuth } from "../../utils/fetch_auth";
+
+export function ManageProvider() {
+  const { theme } = useTheme();
+
+  const [providers, setProviders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // ✅ Pagination + Sorting
+  const [page, setPage] = useState(1);
+  const [limit] = useState(6);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  // ✅ FETCH PROVIDERS
+  const fetchProviders = async () => {
+    try {
+      setLoading(true);
+
+      const url = `${USER_ENDPOINTS.fetch_all_provider}?page=${page}&limit=${limit}&sort_by=name&sort_order=${sortOrder}`;
+
+      const res = await fetchWithAuth(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAuthHeaderForFormData()
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Unauthorized or failed");
+      }
+
+      // ✅ Based on backend response
+      setProviders(data.data.providers || []);
+      setTotalPages(data.data.pagination?.total_pages || 1);
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ DELETE PROVIDER
+  const handleDelete = async (userId: string) => {
+    const confirmDelete = window.confirm("Delete this provider?");
+    if (!confirmDelete) return;
+
+    try {
+      const url = USER_ENDPOINTS.delete_user_by_id.replace("{user_id}", userId);
+
+      const res = await fetchWithAuth(url, {
+        method: "DELETE",
+        headers: {
+          ...getAuthHeaderForFormData()
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Delete failed");
+      }
+
+      // ✅ Remove instantly
+      setProviders((prev) => prev.filter((u) => u.id !== userId));
+
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviders();
+  }, [page, sortOrder]);
+
+  return (
+    <div className="p-6">
+
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <h1 className="text-2xl font-bold">
+          Manage Providers
+        </h1>
+
+        {/* Sorting */}
+        <select
+          value={sortOrder}
+          onChange={(e) => {
+            setPage(1);
+            setSortOrder(e.target.value);
+          }}
+          className="px-3 py-2 border rounded-lg"
+        >
+          <option value="asc">Sort: A → Z</option>
+          <option value="desc">Sort: Z → A</option>
+        </select>
+      </div>
+
+      {/* Loading */}
+      {loading && <p>Loading providers...</p>}
+
+      {/* Error */}
+      {error && <div className="text-red-500 mb-4">{error}</div>}
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {providers.map((provider) => (
+          <div
+            key={provider.id}
+            className="p-5 rounded-xl shadow border hover:shadow-lg transition flex flex-col justify-between h-full"
+            style={{
+              backgroundColor: theme === "dark" ? "#0a0a0a" : "#fff",
+              borderColor: "rgba(0,0,0,0.1)"
+            }}
+          >
+            {/* Avatar */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold">
+                {provider.name?.charAt(0)?.toUpperCase() || "P"}
+              </div>
+
+              <div>
+                <h2 className="font-semibold text-lg">
+                  {provider.name || "No Name"}
+                </h2>
+                <p className="text-sm text-gray-400">
+                  {provider.email}
+                </p>
+              </div>
+            </div>
+
+            {/* Info */}
+            <div className="text-sm space-y-2">
+              <p><strong>Phone:</strong> {provider.phone_no || "N/A"}</p>
+              <p><strong>Address:</strong> {provider.address || "N/A"}</p>
+            </div>
+
+            {/* Delete Button */}
+            <button
+              onClick={() => handleDelete(provider.id)}
+              className="mt-5 w-full py-2 rounded-lg bg-red-500 text-white font-semibold hover:bg-red-600 transition"
+            >
+              Delete Provider
+            </button>
+          </div>
+        ))}
+
+      </div>
+
+      {/* ✅ Pagination */}
+      <div className="flex justify-center items-center mt-8 gap-4">
+
+        <button
+          disabled={page === 1}
+          onClick={() => setPage((prev) => prev - 1)}
+          className="px-4 py-2 rounded-lg border disabled:opacity-50"
+        >
+          Prev
+        </button>
+
+        <span className="font-medium">
+          Page {page} of {totalPages}
+        </span>
+
+        <button
+          disabled={page === totalPages}
+          onClick={() => setPage((prev) => prev + 1)}
+          className="px-4 py-2 rounded-lg border disabled:opacity-50"
+        >
+          Next
+        </button>
+
+      </div>
+
+      {/* Empty */}
+      {!loading && providers.length === 0 && (
+        <p className="text-center text-gray-400 mt-10">
+          No providers found
+        </p>
+      )}
+
+    </div>
+  );
+}
