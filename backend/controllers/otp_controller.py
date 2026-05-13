@@ -27,13 +27,6 @@ async def generate_otp(request:Request):
         if not re.match(email_pattern, email.strip()):
             raise HTTPException(status_code=400, detail="Invalid email format")
 
-        # NOTE: We do NOT check if user exists here because this is used for:
-        # 1. New user sign-ups (email doesn't exist yet)
-        # 2. Password reset (email must exist)
-        # The caller should know which flow they're in
-        # For signup flow: OTP verifies email ownership
-        # For reset flow: Backend will return 404 if needed during user lookup
-
         # generate a random 6-digit OTP
         otp = str(random.randint(100000, 999999))
 
